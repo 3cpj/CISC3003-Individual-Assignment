@@ -1,0 +1,515 @@
+Step 1: Installing Laravel 8
+First, you have to install a fresh Laravel 8 application using composer, for this, you just have to open your terminal and run the below command.
+
+composer create-project laravel/laravel crud-ajax
+Plaintext
+Step 2: Database Configuration
+Now in this step, you have to write your database credentials into the .env file, but first, open your phpmyadmin and create a new database with the name crud_ajax. Now just see the below codes, if you have set any username or password other than mine then just write your own credentials.
+
+DB_CONNECTION=mysql
+DB_HOST=localhost
+DB_PORT=3306
+DB_DATABASE=crud_ajax
+DB_USERNAME=root
+DB_PASSWORD=
+Plaintext
+Step 3: Creating Model, Migration and Controller
+In this step, we'll create our Model, Migration and Controller using a single command.
+
+php artisan make:model Employee -mc
+Plaintext
+I've used the -m flag to create a migration, c flag to create a controller. After running the above command a Model with the name Employee.php a controller with the name EmployeeController.php and migration with the name 2021_07_28_100014_create_employees_table.php will be created.
+
+Step 4: Defining Schema
+Now in this step, we'll define our employees table schema so for this just open 
+
+2021_07_28_100014_create_employees_table.php file inside database/migrations/  and just use the below codes.
+
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+class CreateEmployeesTable extends Migration {
+    /**
+     * Run the migrations.
+     *
+     * @return void
+     */
+    public function up() {
+        Schema::create('employees', function (Blueprint $table) {
+            $table->id();
+            $table->string('first_name');
+            $table->string('last_name');
+            $table->string('email');
+            $table->string('phone');
+            $table->string('post');
+            $table->string('avatar');
+            $table->timestamps();
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     *
+     * @return void
+     */
+    public function down() {
+        Schema::dropIfExists('employees');
+    }
+}
+PHP
+Now you have to run this migration by the following command:
+
+php artisan migrate
+Plaintext
+Step 5: Creating Routes
+Now in this step, We'll create routes for our CRUD application. Just use the below codes.
+
+<?php
+
+use App\Http\Controllers\EmployeeController;
+use Illuminate\Support\Facades\Route;
+
+Route::get('/', [EmployeeController::class, 'index']);
+Route::post('/store', [EmployeeController::class, 'store'])->name('store');
+Route::get('/fetchall', [EmployeeController::class, 'fetchAll'])->name('fetchAll');
+Route::delete('/delete', [EmployeeController::class, 'delete'])->name('delete');
+Route::get('/edit', [EmployeeController::class, 'edit'])->name('edit');
+Route::post('/update', [EmployeeController::class, 'update'])->name('update');
+PHP
+Step 6: Working in Model
+Now in this step, we'll write some codes in the Post model. So for this just open the app/Models/Employee.php file and put the below codes.
+
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+
+class Employee extends Model {
+    use HasFactory;
+    protected $fillable = [
+        'first_name',
+        'last_name',
+        'email',
+        'phone',
+        'post',
+        'avatar'
+    ];
+}
+PHP
+Step 7: Working in Controller
+Now, this is the most important step, In this, we'll write all the application logic. So for this just open the app/Http/Controllers/EmployeeController.php file and define each method like the below codes you can copy and paste the below codes.
+
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Employee;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+
+class EmployeeController extends Controller {
+
+	// set index page view
+	public function index() {
+		return view('index');
+	}
+
+	// handle fetch all eamployees ajax request
+	public function fetchAll() {
+		$emps = Employee::all();
+		$output = '';
+		if ($emps->count() > 0) {
+			$output .= '<table class="table table-striped table-sm text-center align-middle">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Avatar</th>
+                <th>Name</th>
+                <th>E-mail</th>
+                <th>Post</th>
+                <th>Phone</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>';
+			foreach ($emps as $emp) {
+				$output .= '<tr>
+                <td>' . $emp->id . '</td>
+                <td><img src="storage/images/' . $emp->avatar . '" width="50" class="img-thumbnail rounded-circle"></td>
+                <td>' . $emp->first_name . ' ' . $emp->last_name . '</td>
+                <td>' . $emp->email . '</td>
+                <td>' . $emp->post . '</td>
+                <td>' . $emp->phone . '</td>
+                <td>
+                  <a href="#" id="' . $emp->id . '" class="text-success mx-1 editIcon" data-bs-toggle="modal" data-bs-target="#editEmployeeModal"><i class="bi-pencil-square h4"></i></a>
+
+                  <a href="#" id="' . $emp->id . '" class="text-danger mx-1 deleteIcon"><i class="bi-trash h4"></i></a>
+                </td>
+              </tr>';
+			}
+			$output .= '</tbody></table>';
+			echo $output;
+		} else {
+			echo '<h1 class="text-center text-secondary my-5">No record present in the database!</h1>';
+		}
+	}
+
+	// handle insert a new employee ajax request
+	public function store(Request $request) {
+		$file = $request->file('avatar');
+		$fileName = time() . '.' . $file->getClientOriginalExtension();
+		$file->storeAs('public/images', $fileName);
+
+		$empData = ['first_name' => $request->fname, 'last_name' => $request->lname, 'email' => $request->email, 'phone' => $request->phone, 'post' => $request->post, 'avatar' => $fileName];
+		Employee::create($empData);
+		return response()->json([
+			'status' => 200,
+		]);
+	}
+
+	// handle edit an employee ajax request
+	public function edit(Request $request) {
+		$id = $request->id;
+		$emp = Employee::find($id);
+		return response()->json($emp);
+	}
+
+	// handle update an employee ajax request
+	public function update(Request $request) {
+		$fileName = '';
+		$emp = Employee::find($request->emp_id);
+		if ($request->hasFile('avatar')) {
+			$file = $request->file('avatar');
+			$fileName = time() . '.' . $file->getClientOriginalExtension();
+			$file->storeAs('public/images', $fileName);
+			if ($emp->avatar) {
+				Storage::delete('public/images/' . $emp->avatar);
+			}
+		} else {
+			$fileName = $request->emp_avatar;
+		}
+
+		$empData = ['first_name' => $request->fname, 'last_name' => $request->lname, 'email' => $request->email, 'phone' => $request->phone, 'post' => $request->post, 'avatar' => $fileName];
+
+		$emp->update($empData);
+		return response()->json([
+			'status' => 200,
+		]);
+	}
+
+	// handle delete an employee ajax request
+	public function delete(Request $request) {
+		$id = $request->id;
+		$emp = Employee::find($id);
+		if (Storage::delete('public/images/' . $emp->avatar)) {
+			Employee::destroy($id);
+		}
+	}
+}
+PHP
+We have stored all the images in the storage directory so to access those images from the public directory we have to run a simple command:
+
+php artisan storage:link
+Plaintext
+We are storing all the images in the storage/images directory.
+
+Step 8: Working in View
+In this step, We'll create only a single view file. Here we'll use the Bootstrap 5 framework for designing this application.
+
+Create a new file inside resources/views with the name index.blade.php. Now, this is the main file from this file we'll write all the designing codes, writes all jquery codes to send HTTP requests to the server.  So just copy and paste the below codes into your index.blade.php file.
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CRUD App Laravel 8 & Ajax</title>
+  <link rel='stylesheet' href='https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.0.2/css/bootstrap.min.css' />
+  <link rel='stylesheet'
+    href='https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.5.0/font/bootstrap-icons.min.css' />
+  <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/v/bs5/dt-1.10.25/datatables.min.css" />
+
+</head>
+{{-- add new employee modal start --}}
+<div class="modal fade" id="addEmployeeModal" tabindex="-1" aria-labelledby="exampleModalLabel"
+  data-bs-backdrop="static" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="exampleModalLabel">Add New Employee</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form action="#" method="POST" id="add_employee_form" enctype="multipart/form-data">
+        @csrf
+        <div class="modal-body p-4 bg-light">
+          <div class="row">
+            <div class="col-lg">
+              <label for="fname">First Name</label>
+              <input type="text" name="fname" class="form-control" placeholder="First Name" required>
+            </div>
+            <div class="col-lg">
+              <label for="lname">Last Name</label>
+              <input type="text" name="lname" class="form-control" placeholder="Last Name" required>
+            </div>
+          </div>
+          <div class="my-2">
+            <label for="email">E-mail</label>
+            <input type="email" name="email" class="form-control" placeholder="E-mail" required>
+          </div>
+          <div class="my-2">
+            <label for="phone">Phone</label>
+            <input type="tel" name="phone" class="form-control" placeholder="Phone" required>
+          </div>
+          <div class="my-2">
+            <label for="post">Post</label>
+            <input type="text" name="post" class="form-control" placeholder="Post" required>
+          </div>
+          <div class="my-2">
+            <label for="avatar">Select Avatar</label>
+            <input type="file" name="avatar" class="form-control" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          <button type="submit" id="add_employee_btn" class="btn btn-primary">Add Employee</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{{-- add new employee modal end --}}
+
+{{-- edit employee modal start --}}
+<div class="modal fade" id="editEmployeeModal" tabindex="-1" aria-labelledby="exampleModalLabel"
+  data-bs-backdrop="static" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="exampleModalLabel">Edit Employee</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form action="#" method="POST" id="edit_employee_form" enctype="multipart/form-data">
+        @csrf
+        <input type="hidden" name="emp_id" id="emp_id">
+        <input type="hidden" name="emp_avatar" id="emp_avatar">
+        <div class="modal-body p-4 bg-light">
+          <div class="row">
+            <div class="col-lg">
+              <label for="fname">First Name</label>
+              <input type="text" name="fname" id="fname" class="form-control" placeholder="First Name" required>
+            </div>
+            <div class="col-lg">
+              <label for="lname">Last Name</label>
+              <input type="text" name="lname" id="lname" class="form-control" placeholder="Last Name" required>
+            </div>
+          </div>
+          <div class="my-2">
+            <label for="email">E-mail</label>
+            <input type="email" name="email" id="email" class="form-control" placeholder="E-mail" required>
+          </div>
+          <div class="my-2">
+            <label for="phone">Phone</label>
+            <input type="tel" name="phone" id="phone" class="form-control" placeholder="Phone" required>
+          </div>
+          <div class="my-2">
+            <label for="post">Post</label>
+            <input type="text" name="post" id="post" class="form-control" placeholder="Post" required>
+          </div>
+          <div class="my-2">
+            <label for="avatar">Select Avatar</label>
+            <input type="file" name="avatar" class="form-control">
+          </div>
+          <div class="mt-2" id="avatar">
+
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          <button type="submit" id="edit_employee_btn" class="btn btn-success">Update Employee</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{{-- edit employee modal end --}}
+
+<body class="bg-light">
+  <div class="container">
+    <div class="row my-5">
+      <div class="col-lg-12">
+        <div class="card shadow">
+          <div class="card-header bg-danger d-flex justify-content-between align-items-center">
+            <h3 class="text-light">Manage Employees</h3>
+            <button class="btn btn-light" data-bs-toggle="modal" data-bs-target="#addEmployeeModal"><i
+                class="bi-plus-circle me-2"></i>Add New Employee</button>
+          </div>
+          <div class="card-body" id="show_all_employees">
+            <h1 class="text-center text-secondary my-5">Loading...</h1>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src='https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js'></script>
+  <script src='https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.0.2/js/bootstrap.bundle.min.js'></script>
+  <script type="text/javascript" src="https://cdn.datatables.net/v/bs5/dt-1.10.25/datatables.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script>
+    $(function() {
+
+      // add new employee ajax request
+      $("#add_employee_form").submit(function(e) {
+        e.preventDefault();
+        const fd = new FormData(this);
+        $("#add_employee_btn").text('Adding...');
+        $.ajax({
+          url: '{{ route('store') }}',
+          method: 'post',
+          data: fd,
+          cache: false,
+          contentType: false,
+          processData: false,
+          dataType: 'json',
+          success: function(response) {
+            if (response.status == 200) {
+              Swal.fire(
+                'Added!',
+                'Employee Added Successfully!',
+                'success'
+              )
+              fetchAllEmployees();
+            }
+            $("#add_employee_btn").text('Add Employee');
+            $("#add_employee_form")[0].reset();
+            $("#addEmployeeModal").modal('hide');
+          }
+        });
+      });
+
+      // edit employee ajax request
+      $(document).on('click', '.editIcon', function(e) {
+        e.preventDefault();
+        let id = $(this).attr('id');
+        $.ajax({
+          url: '{{ route('edit') }}',
+          method: 'get',
+          data: {
+            id: id,
+            _token: '{{ csrf_token() }}'
+          },
+          success: function(response) {
+            $("#fname").val(response.first_name);
+            $("#lname").val(response.last_name);
+            $("#email").val(response.email);
+            $("#phone").val(response.phone);
+            $("#post").val(response.post);
+            $("#avatar").html(
+              `<img src="storage/images/${response.avatar}" width="100" class="img-fluid img-thumbnail">`);
+            $("#emp_id").val(response.id);
+            $("#emp_avatar").val(response.avatar);
+          }
+        });
+      });
+
+      // update employee ajax request
+      $("#edit_employee_form").submit(function(e) {
+        e.preventDefault();
+        const fd = new FormData(this);
+        $("#edit_employee_btn").text('Updating...');
+        $.ajax({
+          url: '{{ route('update') }}',
+          method: 'post',
+          data: fd,
+          cache: false,
+          contentType: false,
+          processData: false,
+          dataType: 'json',
+          success: function(response) {
+            if (response.status == 200) {
+              Swal.fire(
+                'Updated!',
+                'Employee Updated Successfully!',
+                'success'
+              )
+              fetchAllEmployees();
+            }
+            $("#edit_employee_btn").text('Update Employee');
+            $("#edit_employee_form")[0].reset();
+            $("#editEmployeeModal").modal('hide');
+          }
+        });
+      });
+
+      // delete employee ajax request
+      $(document).on('click', '.deleteIcon', function(e) {
+        e.preventDefault();
+        let id = $(this).attr('id');
+        let csrf = '{{ csrf_token() }}';
+        Swal.fire({
+          title: 'Are you sure?',
+          text: "You won't be able to revert this!",
+          icon: 'warning',
+          showCancelButton: true,
+          confirmButtonColor: '#3085d6',
+          cancelButtonColor: '#d33',
+          confirmButtonText: 'Yes, delete it!'
+        }).then((result) => {
+          if (result.isConfirmed) {
+            $.ajax({
+              url: '{{ route('delete') }}',
+              method: 'delete',
+              data: {
+                id: id,
+                _token: csrf
+              },
+              success: function(response) {
+                console.log(response);
+                Swal.fire(
+                  'Deleted!',
+                  'Your file has been deleted.',
+                  'success'
+                )
+                fetchAllEmployees();
+              }
+            });
+          }
+        })
+      });
+
+      // fetch all employees ajax request
+      fetchAllEmployees();
+
+      function fetchAllEmployees() {
+        $.ajax({
+          url: '{{ route('fetchAll') }}',
+          method: 'get',
+          success: function(response) {
+            $("#show_all_employees").html(response);
+            $("table").DataTable({
+              order: [0, 'desc']
+            });
+          }
+        });
+      }
+    });
+  </script>
+</body>
+
+</html>
+PHP
+I've included all the CDN links of libraries that I'm using in this application.
+
+Step 9: Serve The Application
+Now our application is ready to be served. You just need to run a command to run your CRUD Application. Just use the below command in your terminal:
+
+php artisan serve
+Plaintext
+Now open your browser and put http://127.0.0.1:8000/ to the address bar and hit enter to use your application. 
